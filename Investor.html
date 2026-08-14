@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Investor Portal - GROWMORE</title>
+<style>
+body{background:#0a0a0a;color:#fff;padding:20px;text-align:center;font-family:Arial;margin:0} 
+.card{background:#1a1a1a;padding:30px;border-radius:10px;border:2px solid #00ff88;max-width:500px;margin:40px auto} 
+h1{color:#00ff88} 
+h2{color:#00ff88} 
+b{color:#00ff88;font-size:1.2em}
+</style>
+</head>
+<body>
+<h1>Investor Dashboard</h1>
+<div class="card">
+  <h2>Welcome, <span id="invName">Investor</span></h2>
+  <p>Investment Amount: <b id="invAmount">₦0</b></p>
+  <p>Status: <b id="invStatus">Pending</b></p>
+  <p>Expected Return: <b id="invReturn">₦0</b></p>
+  <p style="color:#aaa;font-size:14px">Payout in 30 Days</p>
+</div>
+
+<script type="module">
+  import { auth, db, onAuthStateChanged, doc, getDoc } from './firebase.js';
+  onAuthStateChanged(auth, async user => {
+    if(user){
+      let snap = await getDoc(doc(db, "investors", user.uid));
+      if(snap.exists()){
+        let d = snap.data();
+        document.getElementById('invName').innerText = d.name;
+        document.getElementById('invAmount').innerText = '₦' + d.amount;
+        document.getElementById('invStatus').innerText = d.status;
+        document.getElementById('invReturn').innerText = '₦' + (d.amount * 2);
+      }
+    } else {
+      window.location = 'index.html'
+    }
+  });
+</script>
+</body>
+</html>
