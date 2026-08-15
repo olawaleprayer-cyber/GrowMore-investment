@@ -4,12 +4,12 @@
   import { getFirestore, doc, setDoc, getDoc, collection, addDoc, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
   const firebaseConfig = {
-    apiKey: "PASTE_YOURS_HERE",
+    apiKey: "AIzaSyCiX9H4H_sR_pCIUoJ1NQOSISC221qQDyw",
     authDomain: "growmore-investments.firebaseapp.com",
     projectId: "growmore-investments",
     storageBucket: "growmore-investments.appspot.com",
-    messagingSenderId: "PASTE_YOURS_HERE",
-    appId: "PASTE_YOURS_HERE"
+    messagingSenderId: "633069707266",
+    appId: "1:633069707266:web:de27c2071f4f2bb5e7071b"
   };
 
   const app = initializeApp(firebaseConfig);
