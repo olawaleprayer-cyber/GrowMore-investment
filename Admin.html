@@ -13,6 +13,8 @@ input,select,textarea{padding:8px;margin:5px;background:#2a2a2a;color:#fff;borde
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:15px}
 .stat{background:#1a1a1a;padding:20px;border-radius:8px;text-align:center;border:1px solid #00ff88}
 .stat h3{color:#00ff88;margin:0;font-size:32px}
+.toggle{margin:10px 0}.toggle input{width:20px}
+.gateway-box{border:1px dashed #00ff88;padding:10px;margin:10px 0;border-radius:5px}
 </style>
 </head>
 <body>
@@ -26,6 +28,33 @@ input,select,textarea{padding:8px;margin:5px;background:#2a2a2a;color:#fff;borde
     <div class="stat"><h3 id="totalInvested">₦0</h3>Total Invested</div>
   </div>
   <button class="btn btn-danger" onclick="resetWebsite()">⚠️ Reset Website</button>
+</div>
+
+<!-- NEW SECTION: GATEWAY CONTROL -->
+<div class="section">
+  <h2>💳 Payment Gateway Control</h2>
+  <p>Turn ON/OFF gateways and paste API Keys here. Deposit page will auto-update.</p>
+
+  <div class="gateway-box">
+    <div class="toggle"><input type="checkbox" id="paystackToggle"> <b>Enable Paystack</b></div>
+    Public Key: <input type="text" id="paystackKey" placeholder="pk_live_...">
+  </div>
+
+  <div class="gateway-box">
+    <div class="toggle"><input type="checkbox" id="flutterToggle"> <b>Enable Flutterwave</b></div>
+    Public Key: <input type="text" id="flutterKey" placeholder="FLWPUBK_...">
+  </div>
+
+  <div class="gateway-box">
+    <div class="toggle"><input type="checkbox" id="payvesselToggle"> <b>Enable Payvessel</b></div>
+    Merchant ID: <input type="text" id="payvesselId" placeholder="PV_MERCHANT_ID">
+  </div>
+
+  <div class="gateway-box">
+    <div class="toggle"><input type="checkbox" id="manualToggle"> <b>Enable Manual Deposit</b></div>
+  </div>
+
+  <button class="btn" onclick="saveGateways()">💾 Save Gateway Settings</button>
 </div>
 
 <div class="section">
@@ -80,7 +109,6 @@ input,select,textarea{padding:8px;margin:5px;background:#2a2a2a;color:#fff;borde
 
 <div class="section">
   <h2>9. Site Settings</h2>
-  Payment Gateway: <select id="gateway"><option>Paystack</option><option>Flutterwave</option><option>Payvessel</option><option>Monnify</option></select><br>
   Bank Details: <input type="text" id="bankDetails"><br>
   Support Telegram: <input type="text" id="telegram"><br>
   <button class="btn" onclick="saveSettings()">Save Settings</button>
@@ -94,7 +122,34 @@ const defaultPlans = ["Evergreen Growth","Legacy League","Horizon Horizon","Futu
 loadAll();
 
 async function loadAll(){
-  loadPlans(); loadDeposits(); loadWithdraws(); loadStats(); loadInvestments(); loadTasks(); loadComplaints(); loadSettings();
+  loadPlans(); loadDeposits(); loadWithdraws(); loadStats(); loadInvestments(); loadTasks(); loadComplaints(); loadSettings(); loadGateways();
+}
+
+// NEW: LOAD + SAVE GATEWAYS
+async function loadGateways(){
+  const s = await getDoc(doc(db, "settings", "gateways"));
+  if(s.exists()){
+    let d = s.data();
+    document.getElementById('paystackToggle').checked = d.paystack;
+    document.getElementById('flutterToggle').checked = d.flutterwave;
+    document.getElementById('payvesselToggle').checked = d.payvessel;
+    document.getElementById('manualToggle').checked = d.manual;
+    document.getElementById('paystackKey').value = d.paystackKey || '';
+    document.getElementById('flutterKey').value = d.flutterKey || '';
+    document.getElementById('payvesselId').value = d.payvesselId || '';
+  }
+}
+window.saveGateways = async () => {
+  await setDoc(doc(db, "settings", "gateways"), {
+    paystack: document.getElementById('paystackToggle').checked,
+    flutterwave: document.getElementById('flutterToggle').checked,
+    payvessel: document.getElementById('payvesselToggle').checked,
+    manual: document.getElementById('manualToggle').checked,
+    paystackKey: document.getElementById('paystackKey').value,
+    flutterKey: document.getElementById('flutterKey').value,
+    payvesselId: document.getElementById('payvesselId').value
+  });
+  alert('✅ Gateway Settings Saved!');
 }
 
 // 1. PLANS
@@ -192,15 +247,10 @@ async function loadComplaints(){
 
 // 9. SETTINGS + RESET
 async function loadSettings(){
-  const s = await getDoc(doc(db, "settings", "main")); if(s.exists()){ document.getElementById('gateway').value=s.data().gateway; document.getElementById('bankDetails').value=s.data().bank; document.getElementById('telegram').value=s.data().telegram; }
+  const s = await getDoc(doc(db, "settings", "main")); if(s.exists()){ document.getElementById('bankDetails').value=s.data().bank; document.getElementById('telegram').value=s.data().telegram; }
 }
 window.saveSettings = async () => {
-  await setDoc(doc(db, "settings", "main"), {gateway: document.getElementById('gateway').value, bank: document.getElementById('bankDetails').value, telegram: document.getElementById('telegram').value}); alert('Saved');
+  await setDoc(doc(db, "settings", "main"), {bank: document.getElementById('bankDetails').value, telegram: document.getElementById('telegram').value}); alert('Saved');
 }
 async function loadStats(){
-  const users = await getDocs(collection(db, "users")); document.getElementById('totalUsers').innerText = users.size;
-}
-window.resetWebsite = async () => { if(confirm('Delete all data?')){ alert('Reset function - connect this to delete collections') } }
-</script>
-</body>
-</html>
+  const users = await getDocs(collection(db, "users")); document.getElementById('totalUsers').inner
