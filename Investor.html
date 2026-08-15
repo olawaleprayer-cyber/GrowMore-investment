@@ -1,41 +1,126 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<title>Investor Portal - GROWMORE</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Invest - EarnHub</title>
 <style>
-body{background:#0a0a0a;color:#fff;padding:20px;text-align:center;font-family:Arial;margin:0} 
-.card{background:#1a1a1a;padding:30px;border-radius:10px;border:2px solid #00ff88;max-width:500px;margin:40px auto} 
-h1{color:#00ff88} 
-h2{color:#00ff88} 
-b{color:#00ff88;font-size:1.2em}
+body { font-family: Arial, sans-serif; background: #f5f5f5; margin: 0; padding: 20px; }
+.header { background: #4CAF50; color: white; padding: 15px; text-align: center; border-radius: 10px; margin-bottom: 20px; }
+.balance { font-size: 18px; font-weight: bold; }
+.plans-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 15px; }
+.plan-card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+.plan-card h3 { color: #4CAF50; margin: 0 0 10px 0; }
+.plan-detail { margin: 8px 0; font-size: 14px; }
+.btn { width: 100%; padding: 12px; background: #4CAF50; color: white; border: none; border-radius: 5px; font-size: 16px; cursor: pointer; margin-top: 10px; }
+.btn:disabled { background: #ccc; cursor: not-allowed; }
+.btn:hover:not(:disabled) { background: #45a049; }
+.loading { text-align: center; padding: 20px; }
 </style>
 </head>
 <body>
-<h1>Investor Dashboard</h1>
-<div class="card">
-  <h2>Welcome, <span id="invName">Investor</span></h2>
-  <p>Investment Amount: <b id="invAmount">₦0</b></p>
-  <p>Status: <b id="invStatus">Pending</b></p>
-  <p>Expected Return: <b id="invReturn">₦0</b></p>
-  <p style="color:#aaa;font-size:14px">Payout in 30 Days</p>
+
+<div class="header">
+  <h2>Investment Plans</h2>
+  <div class="balance">Wallet Balance: ₦<span id="balance">0</span></div>
+</div>
+
+<div id="plans" class="plans-container">
+  <div class="loading">Loading plans...</div>
 </div>
 
 <script type="module">
-  import { auth, db, onAuthStateChanged, doc, getDoc } from './firebase.js';
-  onAuthStateChanged(auth, async user => {
-    if(user){
-      let snap = await getDoc(doc(db, "investors", user.uid));
-      if(snap.exists()){
-        let d = snap.data();
-        document.getElementById('invName').innerText = d.name;
-        document.getElementById('invAmount').innerText = '₦' + d.amount;
-        document.getElementById('invStatus').innerText = d.status;
-        document.getElementById('invReturn').innerText = '₦' + (d.amount * 2);
-      }
-    } else {
-      window.location = 'index.html'
-    }
+import { auth, db, doc, getDoc, updateDoc, collection, addDoc, getDocs } from './firebase.js';
+import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+let currentUser = null;
+let userBalance = 0;
+
+onAuthStateChanged(auth, async (user) => {
+  if(user){
+    currentUser = user;
+    await loadUserBalance();
+    await loadPlans();
+  } else {
+    window.location.href = "login.html";
+  }
+});
+
+async function loadUserBalance(){
+  const userRef = doc(db, "users", currentUser.uid);
+  const userSnap = await getDoc(userRef);
+  if(userSnap.exists()){
+    userBalance = userSnap.data().balance || 0;
+    document.getElementById('balance').innerText = userBalance.toLocaleString();
+  }
+}
+
+async function loadPlans(){
+  const plansRef = collection(db, "plans");
+  const snapshot = await getDocs(plansRef);
+  const plansDiv = document.getElementById('plans');
+  plansDiv.innerHTML = '';
+
+  snapshot.forEach(docSnap => {
+    const plan = docSnap.data();
+    const planId = docSnap.id;
+    const canAfford = userBalance >= plan.amount;
+
+    plansDiv.innerHTML += `
+      <div class="plan-card">
+        <h3>${plan.name}</h3>
+        <div class="plan-detail"><b>Amount:</b> ₦${plan.amount.toLocaleString()}</div>
+        <div class="plan-detail"><b>Daily Profit:</b> ${plan.percent}%</div>
+        <div class="plan-detail"><b>Duration:</b> ${plan.days} Days</div>
+        <div class="plan-detail"><b>Total Return:</b> ₦${(plan.amount * (1 + (plan.percent/100) * plan.days)).toLocaleString()}</div>
+        <button class="btn" ${canAfford ? '' : 'disabled'} onclick="invest('${planId}', ${plan.amount}, ${plan.percent}, ${plan.days})">
+          ${canAfford ? 'Invest Now' : 'Insufficient Balance'}
+        </button>
+      </div>
+    `;
   });
+}
+
+window.invest = async function(planId, amount, percent, days){
+  if(!confirm(`Invest ₦${amount.toLocaleString()} in this plan?`)) return;
+
+  if(userBalance < amount){
+    alert("Insufficient balance!");
+    return;
+  }
+
+  try {
+    // 1. Deduct from user balance
+    const newBalance = userBalance - amount;
+    await updateDoc(doc(db, "users", currentUser.uid), { balance: newBalance });
+
+    // 2. Create investment record
+    const startDate = new Date();
+    const endDate = new Date();
+    endDate.setDate(startDate.getDate() + days);
+
+    await addDoc(collection(db, "investments"), {
+      userId: currentUser.uid,
+      planId: planId,
+      amount: amount,
+      percent: percent,
+      days: days,
+      startDate: startDate,
+      endDate: endDate,
+      status: "active",
+      earned: 0
+    });
+
+    alert("Investment Successful!");
+    userBalance = newBalance;
+    document.getElementById('balance').innerText = userBalance.toLocaleString();
+    loadPlans(); // refresh buttons
+
+  } catch(error){
+    alert("Error: " + error.message);
+  }
+}
 </script>
+
 </body>
-</html>
+  </html>
