@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Withdraw - EarnHub</title>
+<style>
+body { font-family: Arial, sans-serif; background: #f5f5f5; margin: 0; padding: 20px; }
+.container { max-width: 500px; margin: auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+.header { background: #FF5722; color: white; padding: 15px; text-align: center; border-radius: 10px; margin-bottom: 20px; }
+.balance { font-size: 18px; font-weight: bold; }
+input, select { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
+.btn { width: 100%; padding: 12px; background: #FF5722; color: white; border: none; border-radius: 5px; font-size: 16px; cursor: pointer; }
+.btn:hover { background: #e64a19; }
+.note { background: #fff3cd; padding: 10px; border-radius: 5px; font-size: 13px; margin: 10px 0; }
+.history { margin-top: 20px; }
+.history-item { background: #f9f9f9; padding: 10px; border-radius: 5px; margin: 8px 0; font-size: 14px; }
+.status-pending { color: orange; }
+.status-approved { color: green; }
+.status-rejected { color: red; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h2>Withdraw Funds</h2>
+  <div class="balance">Wallet Balance: ₦<span id="balance">0</span></div>
+</div>
+
+<div class="container">
+  <div class="note">
+    <b>Note:</b> Minimum withdrawal is ₦1000. Withdrawals are processed within 24 hours.
+  </div>
+
+  <form id="withdrawForm">
+    <input type="number" id="amount" placeholder="Amount to withdraw ₦" required>
+    
+    <select id="method" required>
+      <option value="">Select Withdrawal Method</option>
+      <option value="Bank Transfer">Bank Transfer</option>
+      <option value="USDT">USDT TRC20</option>
+    </select>
+
+    <input type="text" id="accountName" placeholder="Account Name / USDT Address" required>
+    <input type="text" id="accountNumber" placeholder="Account Number / Bank Name" required>
+
+    <button type="submit" class="btn">Request Withdrawal</button>
+  </form>
+
+  <div class="history">
+    <h3>Withdrawal History</h3>
+    <div id="historyList">Loading...</div>
+  </div>
+</div>
+
+<script type="module">
+import { auth, db, doc, getDoc, addDoc, collection, getDocs, query, where } from './firebase.js';
+import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+let currentUser = null;
+let userBalance = 0;
+
+onAuthStateChanged(auth, async (user) => {
+  if(user){
+    currentUser = user;
+    await loadUserBalance();
+    await loadHistory();
+  } else {
+    window.location.href = "login.html";
+  }
+});
+
+async function loadUserBalance(){
+  const userRef = doc(db, "users", currentUser.uid);
+  const userSnap = await getDoc(userRef);
+  if(userSnap.exists()){
+    userBalance = userSnap.data().balance || 0;
+    document.getElementById('balance').innerText = userBalance.toLocaleString();
+  }
+}
+
+document.getElementById('withdrawForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  
+  const amount = parseFloat(document.getElementById('amount').value);
+  const method = document.getElementById('method').value;
+  const accountName = document.getElementById('accountName').value;
+  const accountNumber = document.getElementById('accountNumber').value;
+
+  if(amount < 1000){
+    alert("Minimum withdrawal is ₦1000");
+    return;
+  }
+  if(amount > userBalance){
+    alert("Insufficient balance");
+    return;
+  }
+
+  try {
+    await addDoc(collection(db, "withdrawals"), {
+      userId: currentUser.uid,
+      amount: amount,
+      method: method,
+      accountName: accountName,
+      accountNumber: accountNumber,
+      status: "pending",
+      date: new Date()
+    });
+
+    alert("Withdrawal request submitted! It will be processed soon.");
+    document.getElementById('withdrawForm').reset();
+    loadHistory();
+  } catch(error){
+    alert("Error: " + error.message);
+  }
+});
+
+async function loadHistory(){
+  const q = query(collection(db, "withdrawals"), where("userId", "==", currentUser.uid));
+  const snapshot = await getDocs(q);
+  const historyDiv = document.getElementById('historyList');
+  historyDiv.innerHTML = '';
+
+  if(snapshot.empty){
+    historyDiv.innerHTML = '<p>No withdrawals yet</p>';
+    return;
+  }
+
+  snapshot.forEach(docSnap => {
+    const w = docSnap.data();
+    const statusClass = `status-${w.status}`;
+    historyDiv.innerHTML += `
+      <div class="history-item">
+        <b>₦${w.amount.toLocaleString()}</b> via ${w.method}<br>
+        Status: <span class="${statusClass}">${w.status}</span><br>
+        Date: ${new Date(w.date.seconds * 1000).toLocaleDateString()}
+      </div>
+    `;
+  });
+}
+</script>
+
+</body>
+  </html>
