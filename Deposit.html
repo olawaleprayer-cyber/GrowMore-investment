@@ -1,44 +1,160 @@
 <!DOCTYPE html>
 <html lang="en">
-<head><meta charset="UTF-8"><title>Deposit - GrowMore</title>
-<style>
-body{font-family:Arial;background:#f5f5f5;padding:20px} .container{max-width:600px;margin:auto;background:white;padding:20px;border-radius:10px}
-.method{background:#f0f0f0;padding:15px;border-radius:8px;margin-bottom:15px} .btn{width:100%;padding:12px;border:none;border-radius:5px;font-weight:bold;font-size:16px;cursor:pointer;color:white}
-.btn-paystack{background:#0b3c61;} .btn-flutter{background:#FB912A;} .btn-payvessel{background:#1a73e8;} .btn-manual{background:#FF5722;}
-</style></head>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Deposit Funds</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f4f4f4; padding: 20px; }
+   .container { max-width: 400px; margin: auto; background: #fff; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+    h2 { text-align: center; color: #333; }
+   .balance { text-align: center; font-size: 20px; margin-bottom: 15px; font-weight: bold; color: #007bff; }
+   .info { background: #fff3cd; padding: 12px; border-radius: 5px; font-size: 14px; margin-bottom: 15px; text-align: center; border-left: 4px solid #ffc107; }
+    input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ccc; border-radius: 5px; font-size: 16px; box-sizing: border-box; }
+    button { width: 100%; padding: 12px; background: #007bff; color: white; border: none; border-radius: 5px; font-size: 16px; cursor: pointer; font-weight: bold; }
+    button:disabled { background: #ccc; cursor: not-allowed; }
+   .error { color: red; text-align: center; margin-top: 10px; font-weight: bold; }
+   .success { color: green; text-align: center; margin-top: 10px; font-weight: bold; }
+   .bank-details { background: #f8f9fa; padding: 10px; border-radius: 5px; margin: 15px 0; text-align: left; font-size: 14px; }
+   .loading { text-align: center; color: #666; }
+  </style>
+</head>
 <body>
+
 <div class="container">
-  <a href="Dashboard.html">← Back</a>
-  <h2>💰 Fund Wallet</h2>
-  <input type="number" id="amount" placeholder="Enter amount in USD" style="width:100%;padding:10px;margin-bottom:15px">
-  <div id="gateways">Loading...</div>
+  <h2>Deposit Funds</h2>
+  <div class="balance">Current Balance: ₦<span id="balance">0</span></div>
+
+  <div class="info" id="infoBox">
+    <div class="loading">Loading deposit rules...</div>
+  </div>
+
+  <div class="bank-details" id="bankDetails">
+    Loading bank details...
+  </div>
+
+  <input type="number" id="amount" placeholder="Enter amount to deposit">
+  <input type="text" id="reference" placeholder="Payment Reference / Transaction ID">
+  <button id="depositBtn">Submit Deposit</button>
+
+  <p class="error" id="errorMsg"></p>
+  <p class="success" id="successMsg"></p>
 </div>
 
-<script src="https://js.paystack.co/v1/inline.js"></script>
-<script src="https://checkout.flutterwave.com/v3.js"></script>
 <script type="module">
-import { auth, db, doc, getDoc } from './firebase.js';
-import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+  import {
+    auth,
+    db,
+    doc,
+    getDoc,
+    addDoc,
+    collection,
+    serverTimestamp,
+    onAuthStateChanged
+  } from './firebase.js';
 
-let currentUser = null;
-let settings = {};
+  let MIN_DEPOSIT = 3000; // Default fallback
 
-onAuthStateChanged(auth, async (user) => {
-  if(!user) return window.location.href = "login.html";
-  currentUser = user;
-  const settingsSnap = await getDoc(doc(db, "settings", "gateways"));
-  settings = settingsSnap.data() || {};
-  renderGateways();
-});
+  const amountInput = document.getElementById('amount');
+  const referenceInput = document.getElementById('reference');
+  const depositBtn = document.getElementById('depositBtn');
+  const errorMsg = document.getElementById('errorMsg');
+  const successMsg = document.getElementById('successMsg');
+  const balanceSpan = document.getElementById('balance');
+  const infoBox = document.getElementById('infoBox');
+  const bankDiv = document.getElementById('bankDetails');
 
-function renderGateways(){
-  let html = "";
-  if(settings.paystack) html += `<div class="method"><h3>💳 Paystack</h3><button class="btn btn-paystack" onclick="payWithPaystack()">Pay with Paystack</button></div>`;
-  if(settings.flutterwave) html += `<div class="method"><h3>🌍 Flutterwave</h3><button class="btn btn-flutter" onclick="payWithFlutterwave()">Pay with Flutterwave</button></div>`;
-  if(settings.payvessel) html += `<div class="method"><h3>🏦 Payvessel</h3><button class="btn btn-payvessel" onclick="payWithPayvessel()">Pay with Payvessel</button></div>`;
-  if(settings.manual) html += `<div class="method"><h3>📄 Manual</h3><button class="btn btn-manual" onclick="window.location='ManualDeposit.html'">Submit Proof</button></div>`;
-  document.getElementById('gateways').innerHTML = html || "No payment methods active. Contact Admin";
-}
+  let currentUser = null;
+  let userBalance = 0;
 
-window.payWithPaystack = function(){
-  const amount
+  // Load rules + bank details from Firebase
+  async function loadSettings() {
+    // Load min deposit
+    const rulesSnap = await getDoc(doc(db, "settings", "rules"));
+    if(rulesSnap.exists()){
+      const data = rulesSnap.data();
+      MIN_DEPOSIT = data.minDeposit || 3000;
+    }
+
+    // Load bank details
+    const mainSnap = await getDoc(doc(db, "settings", "main"));
+    if(mainSnap.exists()){
+      const data = mainSnap.data();
+      bankDiv.innerHTML = `
+        <b>Bank Transfer Details:</b><br>
+        ${data.bank || 'Set bank details in Admin Panel'}<br>
+        <small>Use your email as payment reference</small>
+      `;
+    }
+
+    updateInfoBox();
+  }
+
+  function updateInfoBox(){
+    infoBox.innerHTML = `
+      <b>Minimum Deposit: ₦${MIN_DEPOSIT}</b><br>
+      Deposit anytime. Funds will be added after confirmation.
+    `;
+  }
+
+  // Get user data
+  onAuthStateChanged(auth, async (user) => {
+    if(user){
+      currentUser = user;
+      const userRef = doc(db, "users", user.uid);
+      const userSnap = await getDoc(userRef);
+      if(userSnap.exists()){
+        userBalance = userSnap.data().balance || 0;
+        balanceSpan.innerText = userBalance;
+      }
+      await loadSettings(); // Load settings after user is loaded
+    } else {
+      window.location.href = "Login.html";
+    }
+  });
+
+  // Submit deposit
+  depositBtn.addEventListener('click', async () => {
+    errorMsg.innerText = '';
+    successMsg.innerText = '';
+
+    const amount = parseFloat(amountInput.value);
+    const reference = referenceInput.value.trim();
+
+    // Validations
+    if(!amount || amount <= 0) return errorMsg.innerText = "Enter a valid amount";
+    if(amount < MIN_DEPOSIT) return errorMsg.innerText = `Minimum deposit is ₦${MIN_DEPOSIT}`;
+    if(!reference) return errorMsg.innerText = "Enter payment reference / transaction ID";
+
+    const confirmDeposit = confirm(`Deposit ₦${amount}?\nReference: ${reference}\n\nProceed?`);
+    if(!confirmDeposit) return;
+
+    depositBtn.disabled = true;
+    depositBtn.innerText = "Processing...";
+
+    try {
+      // Save deposit request - Admin will approve and add to balance
+      await addDoc(collection(db, "deposits"), {
+        userId: currentUser.uid,
+        email: currentUser.email,
+        amount: amount,
+        reference: reference,
+        status: "pending",
+        createdAt: serverTimestamp()
+      });
+
+      successMsg.innerText = `Deposit request of ₦${amount} submitted! We will confirm and credit your account soon.`;
+      amountInput.value = '';
+      referenceInput.value = '';
+
+    } catch (err) {
+      errorMsg.innerText = "Error: " + err.message;
+    }
+
+    depositBtn.disabled = false;
+    depositBtn.innerText = "Submit Deposit";
+  });
+
+</script>
+</body>
+    </html>
