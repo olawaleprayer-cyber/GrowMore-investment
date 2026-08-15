@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><title>Deposit - GrowMore</title>
+<style>
+body{font-family:Arial;background:#f5f5f5;padding:20px} .container{max-width:600px;margin:auto;background:white;padding:20px;border-radius:10px}
+.method{background:#f0f0f0;padding:15px;border-radius:8px;margin-bottom:15px} .btn{width:100%;padding:12px;border:none;border-radius:5px;font-weight:bold;font-size:16px;cursor:pointer;color:white}
+.btn-paystack{background:#0b3c61;} .btn-flutter{background:#FB912A;} .btn-payvessel{background:#1a73e8;} .btn-manual{background:#FF5722;}
+</style></head>
+<body>
+<div class="container">
+  <a href="Dashboard.html">← Back</a>
+  <h2>💰 Fund Wallet</h2>
+  <input type="number" id="amount" placeholder="Enter amount in USD" style="width:100%;padding:10px;margin-bottom:15px">
+  <div id="gateways">Loading...</div>
+</div>
+
+<script src="https://js.paystack.co/v1/inline.js"></script>
+<script src="https://checkout.flutterwave.com/v3.js"></script>
+<script type="module">
+import { auth, db, doc, getDoc } from './firebase.js';
+import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+let currentUser = null;
+let settings = {};
+
+onAuthStateChanged(auth, async (user) => {
+  if(!user) return window.location.href = "login.html";
+  currentUser = user;
+  const settingsSnap = await getDoc(doc(db, "settings", "gateways"));
+  settings = settingsSnap.data() || {};
+  renderGateways();
+});
+
+function renderGateways(){
+  let html = "";
+  if(settings.paystack) html += `<div class="method"><h3>💳 Paystack</h3><button class="btn btn-paystack" onclick="payWithPaystack()">Pay with Paystack</button></div>`;
+  if(settings.flutterwave) html += `<div class="method"><h3>🌍 Flutterwave</h3><button class="btn btn-flutter" onclick="payWithFlutterwave()">Pay with Flutterwave</button></div>`;
+  if(settings.payvessel) html += `<div class="method"><h3>🏦 Payvessel</h3><button class="btn btn-payvessel" onclick="payWithPayvessel()">Pay with Payvessel</button></div>`;
+  if(settings.manual) html += `<div class="method"><h3>📄 Manual</h3><button class="btn btn-manual" onclick="window.location='ManualDeposit.html'">Submit Proof</button></div>`;
+  document.getElementById('gateways').innerHTML = html || "No payment methods active. Contact Admin";
+}
+
+window.payWithPaystack = function(){
+  const amount
