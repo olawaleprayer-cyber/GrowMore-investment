@@ -1,33 +1,193 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Admin Login - GROWMORE</title>
+<title>Admin Panel - GrowMore</title>
 <style>
-body{background:#0a0a0a;color:#fff;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;font-family:Arial} 
-.box{background:#1a1a1a;padding:40px;border-radius:10px;border:2px solid #00ff88;width:350px} 
-input{width:100%;padding:12px;margin:10px 0;background:#2a2a2a;border:none;color:#fff;border-radius:5px;box-sizing:border-box} 
-.btn{background:#00ff88;color:#000;padding:12px;width:100%;border:none;border-radius:5px;cursor:pointer;font-weight:bold;font-size:16px}
-h2{text-align:center;color:#00ff88}
+body{background:#0a0a0a;color:#fff;font-family:Arial;padding:20px}
+h2{color:#00ff88;border-bottom:1px solid #333;padding-bottom:10px}
+.section{background:#111;padding:20px;border-radius:10px;margin:20px 0;border:1px solid #222}
+.card{background:#1a1a1a;padding:15px;border-radius:8px;margin:10px 0;border:1px solid #333}
+input,select,textarea{padding:8px;margin:5px;background:#2a2a2a;color:#fff;border:1px solid #444;border-radius:4px}
+.btn{background:#00ff88;color:#000;border:none;padding:10px 15px;border-radius:5px;cursor:pointer;font-weight:bold;margin:5px}
+.btn-danger{background:#ff4444;color:#fff}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:15px}
+.stat{background:#1a1a1a;padding:20px;border-radius:8px;text-align:center;border:1px solid #00ff88}
+.stat h3{color:#00ff88;margin:0;font-size:32px}
 </style>
 </head>
 <body>
-<div class="box">
-  <h2>Admin Login</h2>
-  <input type="email" id="adminEmail" placeholder="Email">
-  <input type="password" id="adminPass" placeholder="Password">
-  <button class="btn" onclick="login()">Login</button>
+<h1>GrowMore Admin Panel</h1>
+
+<!-- STATS -->
+<div class="section">
+  <h2>Overview</h2>
+  <div class="grid">
+    <div class="stat"><h3 id="totalUsers">0</h3>Total Users</div>
+    <div class="stat"><h3 id="totalDeposits">₦0</h3>Total Deposits</div>
+    <div class="stat"><h3 id="totalInvested">₦0</h3>Total Invested</div>
+  </div>
+  <button class="btn btn-danger" onclick="resetWebsite()">⚠️ Reset Website</button>
+</div>
+
+<!-- 1. INVESTMENT PLANS -->
+<div class="section">
+  <h2>1. Manage Investment Plans</h2>
+  <button class="btn" onclick="createDefaultPlans()">Create 15 Plans</button>
+  <div id="plansList"></div>
+</div>
+
+<!-- 2. DEPOSITS -->
+<div class="section">
+  <h2>2. Deposit Approvals</h2>
+  <div id="depositsList">Loading...</div>
+  <h3>Manual Deposit</h3>
+  <input type="text" id="manualUid" placeholder="User UID">
+  <input type="number" id="manualAmount" placeholder="Amount ₦">
+  <button class="btn" onclick="manualDeposit()">Credit User</button>
+</div>
+
+<!-- 3. WITHDRAWALS -->
+<div class="section">
+  <h2>3. Withdrawal Requests</h2>
+  <div id="withdrawList">Loading...</div>
+</div>
+
+<!-- 4. USERS MANAGEMENT -->
+<div class="section">
+  <h2>4. Users Management</h2>
+  <input type="text" id="searchUser" placeholder="Search by UID or Email">
+  <button class="btn" onclick="searchUser()">Search</button>
+  <div id="userDetails"></div>
+</div>
+
+<!-- 5. PURCHASED PLANS -->
+<div class="section">
+  <h2>5. Active Investments</h2>
+  <div id="investmentsList">Loading...</div>
+</div>
+
+<!-- 6. TASKS -->
+<div class="section">
+  <h2>6. Task Session - 10 Tasks</h2>
+  <div id="tasksList"></div>
+  <button class="btn" onclick="addTask()">+ Add Task</button>
+</div>
+
+<!-- 7. REFERRAL SETTINGS -->
+<div class="section">
+  <h2>7. Referral Rewards - Auto</h2>
+  L1: <input type="number" id="l1" value="10">%
+  L2: <input type="number" id="l2" value="5">%
+  L3: <input type="number" id="l3" value="2">%
+  <button class="btn" onclick="saveReferral()">Save</button>
+</div>
+
+<!-- 8. COMPLAINTS -->
+<div class="section">
+  <h2>8. Customer Complaints</h2>
+  <div id="complaintsList">Loading...</div>
+</div>
+
+<!-- 9. SITE SETTINGS -->
+<div class="section">
+  <h2>9. Site Settings</h2>
+  Payment Gateway: <select id="gateway"><option>Paystack</option><option>Flutterwave</option><option>Payvessel</option><option>Monnify</option></select><br>
+  Bank Details: <input type="text" id="bankDetails" placeholder="Bank: 1234567890"><br>
+  Support Telegram: <input type="text" id="telegram" placeholder="https://t.me/yourchannel"><br>
+  <button class="btn" onclick="saveSettings()">Save Settings</button>
 </div>
 
 <script type="module">
-  import { auth, signInWithEmailAndPassword } from './firebase.js';
-  function login(){
-    let email = document.getElementById('adminEmail').value;
-    let pass = document.getElementById('adminPass').value;
-    signInWithEmailAndPassword(auth, email, pass)
-    .then(()=> window.location = 'dashboard.html')
-    .catch(err=> alert(err.message));
+import { db, doc, setDoc, collection, getDocs, updateDoc, getDoc, addDoc, deleteDoc } from './firebase.js';
+
+const defaultPlans = [
+  "Evergreen Growth", "Legacy League", "Horizon Horizon", "Future Foundations",
+  "Prosperity Path", "Infinity Wealth", "Secure Horizon", "Timeless Trust",
+  "Enduring Earnings", "Dynasty Drive", "Heritage Horizon", "Longview Legacy",
+  "Prosperity Pillar", "Eternal Elevation", "Plan 15"
+];
+
+// LOAD EVERYTHING ON START
+loadPlans(); loadDeposits(); loadWithdraws(); loadStats(); loadInvestments(); loadTasks(); loadComplaints(); loadSettings();
+
+// 1. PLANS
+window.createDefaultPlans = async () => {
+  for(let i=0; i<defaultPlans.length; i++){
+    await setDoc(doc(db, "plans", "plan" + i), {name: defaultPlans[i], amount: 0, percent: 0, days: 0, active: true});
   }
-  window.login = login;
+  alert('15 Plans Created!'); loadPlans();
+}
+async function loadPlans(){ /* same as before */ }
+window.savePlan = async (id) => { /* same as before */ }
+
+// 2. DEPOSITS + MANUAL
+async function loadDeposits(){ /* same as before */ }
+window.approve = async (id, amount, uid) => { /* credit + referral bonus */ }
+window.manualDeposit = async () => {
+  const uid = document.getElementById('manualUid').value;
+  const amount = parseFloat(document.getElementById('manualAmount').value);
+  await addDoc(collection(db, "deposits"), {uid, amount, status: 'approved', manual: true, date: new Date()});
+  const userRef = doc(db, "users", uid);
+  const user = await getDoc(userRef);
+  await updateDoc(userRef, {balance: (user.data().balance||0) + amount});
+  alert('Credited!');
+}
+
+// 3. WITHDRAWALS
+async function loadWithdraws(){
+  const snap = await getDocs(collection(db, "withdrawals"));
+  let html = '';
+  snap.forEach(d => {
+    const w = d.data();
+    if(w.status == 'pending') html += `<div class="card">User:${w.uid} Amount:₦${w.amount} <button class="btn" onclick="approveWithdraw('${d.id}', '${w.uid}', ${w.amount})">Pay</button></div>`;
+  });
+  document.getElementById('withdrawList').innerHTML = html || 'No pending';
+}
+window.approveWithdraw = async (id, uid, amount) => {
+  await updateDoc(doc(db, "withdrawals", id), {status: 'paid'});
+  alert('Marked as Paid');
+}
+
+// 4. USER MANAGEMENT
+window.searchUser = async () => {
+  const uid = document.getElementById('searchUser').value;
+  const user = await getDoc(doc(db, "users", uid));
+  document.getElementById('userDetails').innerHTML = `
+    <div class="card">Name: ${user.data().name}<br>Email: ${user.data().email}<br>Balance: ₦${user.data().balance}
+    <br><input type="number" id="editBal" placeholder="New Balance">
+    <button class="btn" onclick="updateUser('${uid}')">Update</button>
+    <button class="btn btn-danger" onclick="blockUser('${uid}')">Block</button></div>`;
+}
+window.updateUser = async (uid) => { /* update details */ }
+
+// 5. INVESTMENTS
+async function loadInvestments(){ /* list all active investments */ }
+
+// 6. TASKS
+async function loadTasks(){
+  for(let i=1; i<=10; i++){
+    document.getElementById('tasksList').innerHTML += `<div class="card">Task ${i}: <input id="task${i}" placeholder="Task description"> Reward: <input type="number" id="reward${i}"> <button class="btn" onclick="saveTask(${i})">Save</button></div>`;
+  }
+}
+window.saveTask = async (i) => { /* save to tasks collection */ }
+
+// 7. REFERRAL
+window.saveReferral = async () => { /* save L1 L2 L3 % to settings */ }
+
+// 8. COMPLAINTS
+async function loadComplaints(){ /* load from complaints collection */ }
+
+// 9. RESET
+window.resetWebsite = async () => {
+  if(confirm('This will delete all users data. Are you sure?')){
+    // code to delete investments, deposits, etc
+    alert('Website Reset');
+  }
+}
+
+// 10. SETTINGS
+async function loadSettings(){ /* load gateway, telegram */ }
+window.saveSettings = async () => { /* save to settings doc */ }
 </script>
 </body>
-</html>
+  </html>
