@@ -7,7 +7,7 @@ body{background:#0a0a0a;color:#fff;font-family:Arial;padding:20px}
 h2{color:#00ff88;border-bottom:1px solid #333;padding-bottom:10px}
 .section{background:#111;padding:20px;border-radius:10px;margin:20px 0;border:1px solid #222}
 .card{background:#1a1a1a;padding:15px;border-radius:8px;margin:10px 0;border:1px solid #333}
-input,select,textarea{padding:8px;margin:5px;background:#2a2a2a;color:#fff;border:1px solid #444;border-radius:4px}
+input,select,textarea{padding:8px;margin:5px;background:#2a2a2a;color:#fff;border:1px solid #444;border-radius:4px;width:200px}
 .btn{background:#00ff88;color:#000;border:none;padding:10px 15px;border-radius:5px;cursor:pointer;font-weight:bold;margin:5px}
 .btn-danger{background:#ff4444;color:#fff}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:15px}
@@ -18,7 +18,6 @@ input,select,textarea{padding:8px;margin:5px;background:#2a2a2a;color:#fff;borde
 <body>
 <h1>GrowMore Admin Panel</h1>
 
-<!-- STATS -->
 <div class="section">
   <h2>Overview</h2>
   <div class="grid">
@@ -29,14 +28,12 @@ input,select,textarea{padding:8px;margin:5px;background:#2a2a2a;color:#fff;borde
   <button class="btn btn-danger" onclick="resetWebsite()">⚠️ Reset Website</button>
 </div>
 
-<!-- 1. INVESTMENT PLANS -->
 <div class="section">
   <h2>1. Manage Investment Plans</h2>
   <button class="btn" onclick="createDefaultPlans()">Create 15 Plans</button>
   <div id="plansList"></div>
 </div>
 
-<!-- 2. DEPOSITS -->
 <div class="section">
   <h2>2. Deposit Approvals</h2>
   <div id="depositsList">Loading...</div>
@@ -46,34 +43,28 @@ input,select,textarea{padding:8px;margin:5px;background:#2a2a2a;color:#fff;borde
   <button class="btn" onclick="manualDeposit()">Credit User</button>
 </div>
 
-<!-- 3. WITHDRAWALS -->
 <div class="section">
   <h2>3. Withdrawal Requests</h2>
   <div id="withdrawList">Loading...</div>
 </div>
 
-<!-- 4. USERS MANAGEMENT -->
 <div class="section">
   <h2>4. Users Management</h2>
-  <input type="text" id="searchUser" placeholder="Search by UID or Email">
+  <input type="text" id="searchUser" placeholder="Search by UID">
   <button class="btn" onclick="searchUser()">Search</button>
   <div id="userDetails"></div>
 </div>
 
-<!-- 5. PURCHASED PLANS -->
 <div class="section">
   <h2>5. Active Investments</h2>
   <div id="investmentsList">Loading...</div>
 </div>
 
-<!-- 6. TASKS -->
 <div class="section">
   <h2>6. Task Session - 10 Tasks</h2>
   <div id="tasksList"></div>
-  <button class="btn" onclick="addTask()">+ Add Task</button>
 </div>
 
-<!-- 7. REFERRAL SETTINGS -->
 <div class="section">
   <h2>7. Referral Rewards - Auto</h2>
   L1: <input type="number" id="l1" value="10">%
@@ -82,33 +73,29 @@ input,select,textarea{padding:8px;margin:5px;background:#2a2a2a;color:#fff;borde
   <button class="btn" onclick="saveReferral()">Save</button>
 </div>
 
-<!-- 8. COMPLAINTS -->
 <div class="section">
   <h2>8. Customer Complaints</h2>
   <div id="complaintsList">Loading...</div>
 </div>
 
-<!-- 9. SITE SETTINGS -->
 <div class="section">
   <h2>9. Site Settings</h2>
   Payment Gateway: <select id="gateway"><option>Paystack</option><option>Flutterwave</option><option>Payvessel</option><option>Monnify</option></select><br>
-  Bank Details: <input type="text" id="bankDetails" placeholder="Bank: 1234567890"><br>
-  Support Telegram: <input type="text" id="telegram" placeholder="https://t.me/yourchannel"><br>
+  Bank Details: <input type="text" id="bankDetails"><br>
+  Support Telegram: <input type="text" id="telegram"><br>
   <button class="btn" onclick="saveSettings()">Save Settings</button>
 </div>
 
 <script type="module">
 import { db, doc, setDoc, collection, getDocs, updateDoc, getDoc, addDoc, deleteDoc } from './firebase.js';
 
-const defaultPlans = [
-  "Evergreen Growth", "Legacy League", "Horizon Horizon", "Future Foundations",
-  "Prosperity Path", "Infinity Wealth", "Secure Horizon", "Timeless Trust",
-  "Enduring Earnings", "Dynasty Drive", "Heritage Horizon", "Longview Legacy",
-  "Prosperity Pillar", "Eternal Elevation", "Plan 15"
-];
+const defaultPlans = ["Evergreen Growth","Legacy League","Horizon Horizon","Future Foundations","Prosperity Path","Infinity Wealth","Secure Horizon","Timeless Trust","Enduring Earnings","Dynasty Drive","Heritage Horizon","Longview Legacy","Prosperity Pillar","Eternal Elevation","Plan 15"];
 
-// LOAD EVERYTHING ON START
-loadPlans(); loadDeposits(); loadWithdraws(); loadStats(); loadInvestments(); loadTasks(); loadComplaints(); loadSettings();
+loadAll();
+
+async function loadAll(){
+  loadPlans(); loadDeposits(); loadWithdraws(); loadStats(); loadInvestments(); loadTasks(); loadComplaints(); loadSettings();
+}
 
 // 1. PLANS
 window.createDefaultPlans = async () => {
@@ -117,77 +104,103 @@ window.createDefaultPlans = async () => {
   }
   alert('15 Plans Created!'); loadPlans();
 }
-async function loadPlans(){ /* same as before */ }
-window.savePlan = async (id) => { /* same as before */ }
+async function loadPlans(){
+  const list = document.getElementById('plansList'); list.innerHTML = '';
+  const snap = await getDocs(collection(db, "plans"));
+  snap.forEach(d => {
+    const p = d.data();
+    list.innerHTML += `<div class="card"><b>${p.name}</b><br>Amount: <input type="number" id="amount-${d.id}" value="${p.amount}"> %: <input type="number" id="percent-${d.id}" value="${p.percent}"> Days: <input type="number" id="days-${d.id}" value="${p.days}"><button class="btn" onclick="savePlan('${d.id}')">Save</button></div>`;
+  });
+}
+window.savePlan = async (id) => {
+  await updateDoc(doc(db, "plans", id), {
+    amount: parseFloat(document.getElementById('amount-'+id).value),
+    percent: parseFloat(document.getElementById('percent-'+id).value),
+    days: parseInt(document.getElementById('days-'+id).value)
+  }); alert('Saved');
+}
 
-// 2. DEPOSITS + MANUAL
-async function loadDeposits(){ /* same as before */ }
-window.approve = async (id, amount, uid) => { /* credit + referral bonus */ }
-window.manualDeposit = async () => {
-  const uid = document.getElementById('manualUid').value;
-  const amount = parseFloat(document.getElementById('manualAmount').value);
-  await addDoc(collection(db, "deposits"), {uid, amount, status: 'approved', manual: true, date: new Date()});
-  const userRef = doc(db, "users", uid);
-  const user = await getDoc(userRef);
+// 2. DEPOSITS
+async function loadDeposits(){
+  const list = document.getElementById('depositsList'); list.innerHTML = '';
+  const snap = await getDocs(collection(db, "deposits"));
+  snap.forEach(d => { const dep = d.data(); if(dep.status=='pending') list.innerHTML += `<div class="card">User:${dep.uid}<br>₦${dep.amount}<br>Ref:${dep.ref}<button class="btn" onclick="approve('${d.id}',${dep.amount},'${dep.uid}')">Approve</button></div>`; });
+  if(list.innerHTML=='') list.innerHTML='No pending deposits';
+}
+window.approve = async (id, amount, uid) => {
+  await updateDoc(doc(db, "deposits", id), {status: 'approved'});
+  const userRef = doc(db, "users", uid); const user = await getDoc(userRef);
   await updateDoc(userRef, {balance: (user.data().balance||0) + amount});
-  alert('Credited!');
+  alert('Approved'); loadDeposits(); loadStats();
+}
+window.manualDeposit = async () => {
+  const uid = document.getElementById('manualUid').value; const amount = parseFloat(document.getElementById('manualAmount').value);
+  await addDoc(collection(db, "deposits"), {uid, amount, status: 'approved', manual: true, date: new Date()});
+  const userRef = doc(db, "users", uid); const user = await getDoc(userRef);
+  await updateDoc(userRef, {balance: (user.data().balance||0) + amount}); alert('Credited'); loadStats();
 }
 
 // 3. WITHDRAWALS
 async function loadWithdraws(){
+  const list = document.getElementById('withdrawList'); list.innerHTML = '';
   const snap = await getDocs(collection(db, "withdrawals"));
-  let html = '';
-  snap.forEach(d => {
-    const w = d.data();
-    if(w.status == 'pending') html += `<div class="card">User:${w.uid} Amount:₦${w.amount} <button class="btn" onclick="approveWithdraw('${d.id}', '${w.uid}', ${w.amount})">Pay</button></div>`;
-  });
-  document.getElementById('withdrawList').innerHTML = html || 'No pending';
+  snap.forEach(d => { const w = d.data(); if(w.status=='pending') list.innerHTML += `<div class="card">User:${w.uid}<br>₦${w.amount}<br>Bank:${w.bank}<button class="btn" onclick="approveWithdraw('${d.id}')">Mark Paid</button></div>`; });
+  if(list.innerHTML=='') list.innerHTML='No pending withdrawals';
 }
-window.approveWithdraw = async (id, uid, amount) => {
-  await updateDoc(doc(db, "withdrawals", id), {status: 'paid'});
-  alert('Marked as Paid');
-}
+window.approveWithdraw = async (id) => { await updateDoc(doc(db, "withdrawals", id), {status: 'paid'}); alert('Paid'); loadWithdraws(); }
 
-// 4. USER MANAGEMENT
+// 4. USERS
 window.searchUser = async () => {
   const uid = document.getElementById('searchUser').value;
   const user = await getDoc(doc(db, "users", uid));
-  document.getElementById('userDetails').innerHTML = `
-    <div class="card">Name: ${user.data().name}<br>Email: ${user.data().email}<br>Balance: ₦${user.data().balance}
-    <br><input type="number" id="editBal" placeholder="New Balance">
-    <button class="btn" onclick="updateUser('${uid}')">Update</button>
-    <button class="btn btn-danger" onclick="blockUser('${uid}')">Block</button></div>`;
+  if(!user.exists()){ alert('User not found'); return; }
+  const u = user.data();
+  document.getElementById('userDetails').innerHTML = `<div class="card">Name:${u.name}<br>Email:${u.email}<br>Balance:₦${u.balance}<br><input id="newName" value="${u.name}"><input id="newEmail" value="${u.email}"><input id="newBal" type="number" value="${u.balance}"><button class="btn" onclick="updateUser('${uid}')">Update</button><button class="btn btn-danger" onclick="blockUser('${uid}')">Block</button></div>`;
 }
-window.updateUser = async (uid) => { /* update details */ }
+window.updateUser = async (uid) => {
+  await updateDoc(doc(db, "users", uid), {name: document.getElementById('newName').value, email: document.getElementById('newEmail').value, balance: parseFloat(document.getElementById('newBal').value)}); alert('Updated');
+}
+window.blockUser = async (uid) => { await updateDoc(doc(db, "users", uid), {blocked: true}); alert('User Blocked'); }
 
 // 5. INVESTMENTS
-async function loadInvestments(){ /* list all active investments */ }
+async function loadInvestments(){
+  const list = document.getElementById('investmentsList'); list.innerHTML = '';
+  const snap = await getDocs(collection(db, "investments"));
+  snap.forEach(d => { const inv = d.data(); list.innerHTML += `<div class="card">User:${inv.uid}<br>Plan:₦${inv.amount} - ${inv.percent}%<br>Status:${inv.status}</div>`; });
+}
 
 // 6. TASKS
 async function loadTasks(){
+  const list = document.getElementById('tasksList'); list.innerHTML = '';
   for(let i=1; i<=10; i++){
-    document.getElementById('tasksList').innerHTML += `<div class="card">Task ${i}: <input id="task${i}" placeholder="Task description"> Reward: <input type="number" id="reward${i}"> <button class="btn" onclick="saveTask(${i})">Save</button></div>`;
+    list.innerHTML += `<div class="card">Task ${i}: <input id="task${i}" placeholder="Description"> Reward: <input id="reward${i}" type="number"> <button class="btn" onclick="saveTask(${i})">Save</button></div>`;
   }
 }
-window.saveTask = async (i) => { /* save to tasks collection */ }
+window.saveTask = async (i) => { await setDoc(doc(db, "tasks", "task"+i), {desc: document.getElementById('task'+i).value, reward: parseFloat(document.getElementById('reward'+i).value)}); alert('Task Saved'); }
 
 // 7. REFERRAL
-window.saveReferral = async () => { /* save L1 L2 L3 % to settings */ }
-
-// 8. COMPLAINTS
-async function loadComplaints(){ /* load from complaints collection */ }
-
-// 9. RESET
-window.resetWebsite = async () => {
-  if(confirm('This will delete all users data. Are you sure?')){
-    // code to delete investments, deposits, etc
-    alert('Website Reset');
-  }
+window.saveReferral = async () => {
+  await setDoc(doc(db, "settings", "referral"), {l1: document.getElementById('l1').value, l2: document.getElementById('l2').value, l3: document.getElementById('l3').value}); alert('Saved');
 }
 
-// 10. SETTINGS
-async function loadSettings(){ /* load gateway, telegram */ }
-window.saveSettings = async () => { /* save to settings doc */ }
+// 8. COMPLAINTS
+async function loadComplaints(){
+  const list = document.getElementById('complaintsList'); list.innerHTML = '';
+  const snap = await getDocs(collection(db, "complaints"));
+  snap.forEach(d => { const c = d.data(); list.innerHTML += `<div class="card">From:${c.uid}<br>Msg:${c.message}<br>Status:${c.status}</div>`; });
+}
+
+// 9. SETTINGS + RESET
+async function loadSettings(){
+  const s = await getDoc(doc(db, "settings", "main")); if(s.exists()){ document.getElementById('gateway').value=s.data().gateway; document.getElementById('bankDetails').value=s.data().bank; document.getElementById('telegram').value=s.data().telegram; }
+}
+window.saveSettings = async () => {
+  await setDoc(doc(db, "settings", "main"), {gateway: document.getElementById('gateway').value, bank: document.getElementById('bankDetails').value, telegram: document.getElementById('telegram').value}); alert('Saved');
+}
+async function loadStats(){
+  const users = await getDocs(collection(db, "users")); document.getElementById('totalUsers').innerText = users.size;
+}
+window.resetWebsite = async () => { if(confirm('Delete all data?')){ alert('Reset function - connect this to delete collections') } }
 </script>
 </body>
-  </html>
+</html>
