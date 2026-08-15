@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Sign Up</title>
+<style>
+body{background:#0a0a0a;color:#fff;font-family:Arial;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}
+.card{background:#1a1a1a;padding:40px;border-radius:10px;border:1px solid #00ff88;width:350px}
+input,button{width:100%;padding:12px;margin:10px 0;border-radius:5px;border:none}
+input{background:#2a2a2a;color:#fff}
+button{background:#00ff88;color:#000;font-weight:bold;cursor:pointer;font-size:16px}
+a{color:#00ff88;text-decoration:none}
+</style>
+</head>
+<body>
+<div class="card">
+  <h2>Create Account</h2>
+  <input type="text" id="name" placeholder="Full Name" required>
+  <input type="tel" id="phone" placeholder="Phone Number" required>
+  <input type="password" id="password" placeholder="Password" required>
+  <input type="text" id="referral" placeholder="Referral Code (Optional)">
+  <button onclick="signup()">Sign Up</button>
+  <p>Already have an account? <a href="login.html">Login</a></p>
+</div>
+
+<script type="module">
+import { auth, db, createUserWithEmailAndPassword, doc, setDoc } from './firebase.js';
+
+window.signup = async function(){
+  const name = document.getElementById('name').value;
+  const phone = document.getElementById('phone').value;
+  const password = document.getElementById('password').value;
+  const referral = document.getElementById('referral').value;
+  
+  const fakeEmail = phone + "@growmore.app"
+  
+  try{
+    const userCred = await createUserWithEmailAndPassword(auth, fakeEmail, password);
+    const uid = userCred.user.uid;
+
+    await setDoc(doc(db, "users", uid), {
+      name: name,
+      phone: phone,
+      referralCode: referral,
+      referredBy: referral || null,
+      createdAt: new Date()
+    });
+
+    alert('Account created!');
+    window.location.href = 'dashboard.html';
+  } catch(e){
+    alert(e.message);
+  }
+}
+</script>
+</body>
+                </html>
