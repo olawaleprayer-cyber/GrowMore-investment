@@ -2,8 +2,10 @@
 <html>
 <head>
 <title>Admin Panel - GrowMore</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
 body{background:#0a0a0a;color:#fff;font-family:Arial;padding:20px}
+h1{text-align:center;color:#00ff88}
 h2{color:#00ff88;border-bottom:1px solid #333;padding-bottom:10px}
 .section{background:#111;padding:20px;border-radius:10px;margin:20px 0;border:1px solid #222}
 .card{background:#1a1a1a;padding:15px;border-radius:8px;margin:10px 0;border:1px solid #333}
@@ -15,6 +17,7 @@ input,select,textarea{padding:8px;margin:5px;background:#2a2a2a;color:#fff;borde
 .stat h3{color:#00ff88;margin:0;font-size:32px}
 .toggle{margin:10px 0}.toggle input{width:20px}
 .gateway-box{border:1px dashed #00ff88;padding:10px;margin:10px 0;border-radius:5px}
+.rules-box{background:#1a1a1a;border:1px solid #00ff88;padding:15px;border-radius:8px;margin-bottom:15px}
 </style>
 </head>
 <body>
@@ -30,30 +33,38 @@ input,select,textarea{padding:8px;margin:5px;background:#2a2a2a;color:#fff;borde
   <button class="btn btn-danger" onclick="resetWebsite()">⚠️ Reset Website</button>
 </div>
 
-<!-- NEW SECTION: GATEWAY CONTROL -->
+<div class="section">
+  <h2>⚙️ Withdrawal & Deposit Rules</h2>
+  <div class="rules-box">
+    <b>Current Rules:</b><br>
+    Min Withdrawal: ₦<span id="ruleMinWithdraw">1200</span><br>
+    Withdrawal Days: Monday to Friday<br>
+    Min Deposit: ₦<span id="ruleMinDeposit">3000</span><br>
+    Charges: 0%
+  </div>
+  Change Min Withdrawal: <input type="number" id="minWithdrawInput" value="1200">
+  Change Min Deposit: <input type="number" id="minDepositInput" value="3000">
+  <button class="btn" onclick="saveRules()">💾 Save Rules</button>
+</div>
+
 <div class="section">
   <h2>💳 Payment Gateway Control</h2>
   <p>Turn ON/OFF gateways and paste API Keys here. Deposit page will auto-update.</p>
-
   <div class="gateway-box">
     <div class="toggle"><input type="checkbox" id="paystackToggle"> <b>Enable Paystack</b></div>
     Public Key: <input type="text" id="paystackKey" placeholder="pk_live_...">
   </div>
-
   <div class="gateway-box">
     <div class="toggle"><input type="checkbox" id="flutterToggle"> <b>Enable Flutterwave</b></div>
     Public Key: <input type="text" id="flutterKey" placeholder="FLWPUBK_...">
   </div>
-
   <div class="gateway-box">
     <div class="toggle"><input type="checkbox" id="payvesselToggle"> <b>Enable Payvessel</b></div>
     Merchant ID: <input type="text" id="payvesselId" placeholder="PV_MERCHANT_ID">
   </div>
-
   <div class="gateway-box">
     <div class="toggle"><input type="checkbox" id="manualToggle"> <b>Enable Manual Deposit</b></div>
   </div>
-
   <button class="btn" onclick="saveGateways()">💾 Save Gateway Settings</button>
 </div>
 
@@ -73,7 +84,7 @@ input,select,textarea{padding:8px;margin:5px;background:#2a2a2a;color:#fff;borde
 </div>
 
 <div class="section">
-  <h2>3. Withdrawal Requests</h2>
+  <h2>3. Withdrawal Requests - Min ₦1200, Mon-Fri</h2>
   <div id="withdrawList">Loading...</div>
 </div>
 
@@ -115,25 +126,56 @@ input,select,textarea{padding:8px;margin:5px;background:#2a2a2a;color:#fff;borde
 </div>
 
 <script type="module">
-import { db, doc, setDoc, collection, getDocs, updateDoc, getDoc, addDoc, deleteDoc } from './firebase.js';
+import { db, doc, setDoc, collection, getDocs, updateDoc, getDoc, addDoc, deleteDoc, onAuthStateChanged, auth } from './firebase.js';
+
+// CHANGE THIS TO YOUR ADMIN EMAIL
+onAuthStateChanged(auth, (user) => {
+  if(!user || user.email!== "youradminemail@gmail.com") {
+    alert("Access Denied. Admins only");
+    window.location.href = "Dashboard.html";
+  }
+});
 
 const defaultPlans = ["Evergreen Growth","Legacy League","Horizon Horizon","Future Foundations","Prosperity Path","Infinity Wealth","Secure Horizon","Timeless Trust","Enduring Earnings","Dynasty Drive","Heritage Horizon","Longview Legacy","Prosperity Pillar","Eternal Elevation","Plan 15"];
 
 loadAll();
 
 async function loadAll(){
-  loadPlans(); loadDeposits(); loadWithdraws(); loadStats(); loadInvestments(); loadTasks(); loadComplaints(); loadSettings(); loadGateways();
+  loadPlans(); loadDeposits(); loadWithdraws(); loadStats(); loadInvestments(); loadTasks(); loadComplaints(); loadSettings(); loadGateways(); loadRules();
 }
 
-// NEW: LOAD + SAVE GATEWAYS
+// NEW: Load and Save Rules
+async function loadRules(){
+  const s = await getDoc(doc(db, "settings", "rules"));
+  if(s.exists()){
+    let d = s.data();
+    document.getElementById('minWithdrawInput').value = d.minWithdrawal || 1200;
+    document.getElementById('minDepositInput').value = d.minDeposit || 3000;
+    document.getElementById('ruleMinWithdraw').innerText = d.minWithdrawal || 1200;
+    document.getElementById('ruleMinDeposit').innerText = d.minDeposit || 3000;
+  }
+}
+window.saveRules = async () => {
+  const minW = parseFloat(document.getElementById('minWithdrawInput').value);
+  const minD = parseFloat(document.getElementById('minDepositInput').value);
+  await setDoc(doc(db, "settings", "rules"), {
+    minWithdrawal: minW,
+    minDeposit: minD,
+    withdrawalDays: [1,2,3,4,5] // Mon-Fri
+  });
+  document.getElementById('ruleMinWithdraw').innerText = minW;
+  document.getElementById('ruleMinDeposit').innerText = minD;
+  alert('✅ Rules Saved! User pages will use these values.');
+}
+
 async function loadGateways(){
   const s = await getDoc(doc(db, "settings", "gateways"));
   if(s.exists()){
     let d = s.data();
-    document.getElementById('paystackToggle').checked = d.paystack;
-    document.getElementById('flutterToggle').checked = d.flutterwave;
-    document.getElementById('payvesselToggle').checked = d.payvessel;
-    document.getElementById('manualToggle').checked = d.manual;
+    document.getElementById('paystackToggle').checked = d.paystack || false;
+    document.getElementById('flutterToggle').checked = d.flutterwave || false;
+    document.getElementById('payvesselToggle').checked = d.payvessel || false;
+    document.getElementById('manualToggle').checked = d.manual || false;
     document.getElementById('paystackKey').value = d.paystackKey || '';
     document.getElementById('flutterKey').value = d.flutterKey || '';
     document.getElementById('payvesselId').value = d.payvesselId || '';
@@ -152,7 +194,6 @@ window.saveGateways = async () => {
   alert('✅ Gateway Settings Saved!');
 }
 
-// 1. PLANS
 window.createDefaultPlans = async () => {
   for(let i=0; i<defaultPlans.length; i++){
     await setDoc(doc(db, "plans", "plan" + i), {name: defaultPlans[i], amount: 0, percent: 0, days: 0, active: true});
@@ -175,14 +216,18 @@ window.savePlan = async (id) => {
   }); alert('Saved');
 }
 
-// 2. DEPOSITS
+// UPDATED: Fixed field names to match new Withdraw.html
 async function loadDeposits(){
   const list = document.getElementById('depositsList'); list.innerHTML = '';
   const snap = await getDocs(collection(db, "deposits"));
-  snap.forEach(d => { const dep = d.data(); if(dep.status=='pending') list.innerHTML += `<div class="card">User:${dep.uid}<br>₦${dep.amount}<br>Ref:${dep.ref}<button class="btn" onclick="approve('${d.id}',${dep.amount},'${dep.uid}')">Approve</button></div>`; });
+  snap.forEach(d => {
+    const dep = d.data();
+    if(dep.status=='pending')
+      list.innerHTML += `<div class="card">User:${dep.userId || dep.uid}<br>₦${dep.amount}<br>Ref:${dep.reference || dep.ref}<button class="btn" onclick="approveDeposit('${d.id}',${dep.amount},'${dep.userId || dep.uid}')">Approve</button></div>`;
+  });
   if(list.innerHTML=='') list.innerHTML='No pending deposits';
 }
-window.approve = async (id, amount, uid) => {
+window.approveDeposit = async (id, amount, uid) => {
   await updateDoc(doc(db, "deposits", id), {status: 'approved'});
   const userRef = doc(db, "users", uid); const user = await getDoc(userRef);
   await updateDoc(userRef, {balance: (user.data().balance||0) + amount});
@@ -190,21 +235,34 @@ window.approve = async (id, amount, uid) => {
 }
 window.manualDeposit = async () => {
   const uid = document.getElementById('manualUid').value; const amount = parseFloat(document.getElementById('manualAmount').value);
-  await addDoc(collection(db, "deposits"), {uid, amount, status: 'approved', manual: true, date: new Date()});
+  await addDoc(collection(db, "deposits"), {userId: uid, amount, status: 'approved', manual: true, createdAt: new Date()});
   const userRef = doc(db, "users", uid); const user = await getDoc(userRef);
   await updateDoc(userRef, {balance: (user.data().balance||0) + amount}); alert('Credited'); loadStats();
 }
 
-// 3. WITHDRAWALS
+// UPDATED: Fixed field names to match new Withdraw.html
 async function loadWithdraws(){
   const list = document.getElementById('withdrawList'); list.innerHTML = '';
   const snap = await getDocs(collection(db, "withdrawals"));
-  snap.forEach(d => { const w = d.data(); if(w.status=='pending') list.innerHTML += `<div class="card">User:${w.uid}<br>₦${w.amount}<br>Bank:${w.bank}<button class="btn" onclick="approveWithdraw('${d.id}')">Mark Paid</button></div>`; });
+  snap.forEach(d => {
+    const w = d.data();
+    if(w.status=='pending')
+      list.innerHTML += `<div class="card">User:${w.userId || w.uid}<br>Email:${w.email}<br>Amount:₦${w.amount}<br>Date:${w.createdAt?.toDate().toLocaleString()}<br><button class="btn" onclick="approveWithdraw('${d.id}')">Mark Paid</button><button class="btn btn-danger" onclick="rejectWithdraw('${d.id}',${w.amount},'${w.userId || w.uid}')">Reject & Refund</button></div>`;
+  });
   if(list.innerHTML=='') list.innerHTML='No pending withdrawals';
 }
-window.approveWithdraw = async (id) => { await updateDoc(doc(db, "withdrawals", id), {status: 'paid'}); alert('Paid'); loadWithdraws(); }
+window.approveWithdraw = async (id) => {
+  await updateDoc(doc(db, "withdrawals", id), {status: 'paid'});
+  alert('Marked as Paid');
+  loadWithdraws();
+}
+window.rejectWithdraw = async (id, amount, uid) => {
+  await updateDoc(doc(db, "withdrawals", id), {status: 'rejected'});
+  const userRef = doc(db, "users", uid); const user = await getDoc(userRef);
+  await updateDoc(userRef, {balance: (user.data().balance||0) + amount});
+  alert('Rejected and Refunded'); loadWithdraws(); loadStats();
+}
 
-// 4. USERS
 window.searchUser = async () => {
   const uid = document.getElementById('searchUser').value;
   const user = await getDoc(doc(db, "users", uid));
@@ -217,14 +275,12 @@ window.updateUser = async (uid) => {
 }
 window.blockUser = async (uid) => { await updateDoc(doc(db, "users", uid), {blocked: true}); alert('User Blocked'); }
 
-// 5. INVESTMENTS
 async function loadInvestments(){
   const list = document.getElementById('investmentsList'); list.innerHTML = '';
   const snap = await getDocs(collection(db, "investments"));
   snap.forEach(d => { const inv = d.data(); list.innerHTML += `<div class="card">User:${inv.uid}<br>Plan:₦${inv.amount} - ${inv.percent}%<br>Status:${inv.status}</div>`; });
 }
 
-// 6. TASKS
 async function loadTasks(){
   const list = document.getElementById('tasksList'); list.innerHTML = '';
   for(let i=1; i<=10; i++){
@@ -233,19 +289,16 @@ async function loadTasks(){
 }
 window.saveTask = async (i) => { await setDoc(doc(db, "tasks", "task"+i), {desc: document.getElementById('task'+i).value, reward: parseFloat(document.getElementById('reward'+i).value)}); alert('Task Saved'); }
 
-// 7. REFERRAL
 window.saveReferral = async () => {
   await setDoc(doc(db, "settings", "referral"), {l1: document.getElementById('l1').value, l2: document.getElementById('l2').value, l3: document.getElementById('l3').value}); alert('Saved');
 }
 
-// 8. COMPLAINTS
 async function loadComplaints(){
   const list = document.getElementById('complaintsList'); list.innerHTML = '';
   const snap = await getDocs(collection(db, "complaints"));
   snap.forEach(d => { const c = d.data(); list.innerHTML += `<div class="card">From:${c.uid}<br>Msg:${c.message}<br>Status:${c.status}</div>`; });
 }
 
-// 9. SETTINGS + RESET
 async function loadSettings(){
   const s = await getDoc(doc(db, "settings", "main")); if(s.exists()){ document.getElementById('bankDetails').value=s.data().bank; document.getElementById('telegram').value=s.data().telegram; }
 }
@@ -253,4 +306,9 @@ window.saveSettings = async () => {
   await setDoc(doc(db, "settings", "main"), {bank: document.getElementById('bankDetails').value, telegram: document.getElementById('telegram').value}); alert('Saved');
 }
 async function loadStats(){
-  const users = await getDocs(collection(db, "users")); document.getElementById('totalUsers').inner
+  const users = await getDocs(collection(db, "users")); document.getElementById('totalUsers').innerText = users.size;
+}
+window.resetWebsite = async () => { if(confirm('Delete all data?')){ alert('Reset function - connect this to delete collections') } }
+</script>
+</body>
+  </html>
